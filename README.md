@@ -1,16 +1,16 @@
 ![GymFC](https://github.com/wil3/gymfc/blob/master/images/gymfc-logo.png)
 
-GymFC is flight control tuning framework with a focus in attitude control. 
+GymFC is flight control tuning framework with a focus in attitude control.
 GymFC was first introduced in the [manuscript](http://wfk.io/docs/gymfc.pdf) "Reinforcement learning for UAV attitude control" in which a simulator was used to
-synthesize neuro-flight attitude controllers that exceeded the performance of a traditional PID controller. 
+synthesize neuro-flight attitude controllers that exceeded the performance of a traditional PID controller.
 Since the projects initial release it has matured to become a modular
 framework
 for tuning flight control systems, not only for synthesizing neuro-flight
-controllers but also tuning traditional controllers as well. 
+controllers but also tuning traditional controllers as well.
 GymFC is the primary method for developing controllers to be used in the worlds
 first neural network supported
-flight control firmware [Neuroflight](https://wfk.io/neuroflight). 
-Details of the project and its architecture are best described in Wil Koch's 
+flight control firmware [Neuroflight](https://wfk.io/neuroflight).
+Details of the project and its architecture are best described in Wil Koch's
 [thesis](http://wfk.io/docs/WilliamKochThesisFINAL.pdf) "Flight Controller Synthesis Via Deep Reinforcement Learning".
 
 Please use the following BibTex entries to cite our work,
@@ -42,7 +42,7 @@ Please use the following BibTex entries to cite our work,
 > some effort however it provides a sustainable framework moving forward.
 > Documentation and additional examples will be added with time. Best bet at
 > the moment is to read through the code, python side is in good shape, c++
-> needs love.  
+> needs love.
 
 ## Table of contents
 
@@ -66,46 +66,36 @@ Please use the following BibTex entries to cite our work,
 * Digital twin independence - digital twin is developed external to GymFC
   allowing separate versioning.
 * Google protobuf aircraft digital twin API for publishing control
-  signals and subscribing to sensor data. 
+  signals and subscribing to sensor data.
 * Flexible agent interface allowing controller development for any type of flight control systems.
 * Support for Gazebo 8, 9, and 11. Gazebo plugins are built dynamically depending on
-  your installed version. 
+  your installed version.
 
 
 # News
 
-* July 2019 - GymFC v0.2.0 is released. 
+* July 2019 - GymFC v0.2.0 is released.
 * December 2018 - Our GymFC manuscript is accepted to the journal ACM Transactions on Cyber-Physical Systems.
 * November 2018 - Flight controller synthesized with GymFC achieves stable
   flight in [Neuroflight](https://github.com/wil3/neuroflight).
 * September 2018 - GymFC v0.1.0 is released.
-* April 2018 - Pre-print of our paper is published to [arXiv](https://arxiv.org/abs/1804.04154). 
+* April 2018 - Pre-print of our paper is published to [arXiv](https://arxiv.org/abs/1804.04154).
 
 
-# Installation 
+# Installation
 
-Note, Ubuntu 16.04 LTS and 18.04 LTS are the only OS currently supported. Please submit a PR for the
-README.md if you are
-able to get it working on another platform. To ensure accurate and stable
-simulations it is recommended to use DART with Gazebo. This requires Gazebo to
-be installed from source. For more information please see this
-[video](https://www.youtube.com/watch?v=d3NyFU0bVT0).  We have found these
-versions to work well together,
-1. Compile and install DART v6.7 from source
-   [here](https://github.com/dartsim/dart/tree/v6.7.0).
-1. Compile and install [Gazebo 10](http://gazebosim.org/tutorials?tut=install_from_source&cat=install). 
-2. (Optional) It is suggested to set up a [virtual environment](https://docs.python.org/3/library/venv.html). From the project root,
-   `python3 -m venv env`. This will create an environment named `env` which
-will be ignored by git. To enable the virtual environment, `source
-env/bin/activate` and to deactivate, `deactivate`.  
-2. From root directory of this project, `pip3 install .` If you plan to work with the GymFC source code you will want to install it in
-development mode, `pip3 install -e .` You will also
-need to build the plugin manually by running the script
-`gymfc/envs/assets/gazebo/plugins/build_plugin.sh`.
-3. Confirm `SetupFile` in `gymfc.ini` is pointing to the correct location.
+Note, Ubuntu 16.04 LTS and 18.04 LTS are the only OS currently supported. Please submit a PR for the README.md if you are able to get it working on another platform. To ensure accurate and stable simulations it is recommended to use DART with Gazebo. This requires Gazebo to be installed from source. For more information please see this
+[video](https://www.youtube.com/watch?v=d3NyFU0bVT0).  We have found these versions to work well together,
+
+1. Compile and install DART v6.8.2 from source [here](https://github.com/dartsim/dart/tree/v6.8.2).
+2. Compile and install [Gazebo 10](http://gazebosim.org/tutorials?tut=install_from_source&cat=install).
+3. (Optional) It is suggested to set up a [virtual environment](https://docs.python.org/3/library/venv.html). From the project root, `python3 -m venv env`. This will create an environment named `env` which will be ignored by git. To enable the virtual environment, `source env/bin/activate` and to deactivate, `deactivate`.
+4. From root directory of this project, `pip3 install .` If you plan to work with the GymFC source code you will want to install it in development mode, `pip3 install -e .`
+5. You will also need to build the plugin manually by running the script `gymfc/envs/assets/gazebo/plugins/build_plugin.sh`.
+6. Confirm `SetupFile` in `gymfc.ini` is pointing to the correct location.
 
 
-# Getting Started 
+# Getting Started
 
 The simplest environment can be created with,
 
@@ -124,13 +114,13 @@ this class e.g.,
 
 from gymfc.envs.fc_env import FlightControlEnv
 import gym
-class MyOpenAIEnv(FlightControlEnv, gym.Env):  
+class MyOpenAIEnv(FlightControlEnv, gym.Env):
 ```
- 
+
 For simplicity the GymFC environment takes as input a single `aircraft_config` which is the file location of your aircraft model  `model.sdf`. The SDF declares all the visualizations, geometries and plugins for the aircraft.
 
 ### Directory Layout
-GymFC expects your model to have the following Gazebo style directory structure: 
+GymFC expects your model to have the following Gazebo style directory structure:
 ```
 model_name/
   model.config
@@ -159,7 +149,7 @@ can be done with GymFC. For example this opens up the possibilities for tuning
 PID gains using optimization strategies such as GAs and PSO. The goal is to provide a collection of open source
 modules for users to mix and match. If you have created your own, please let us
 know and we will add it below.
- 
+
 ## Tuners
 
 * [OpenAI baselines](https://github.com/openai/baselines)
@@ -179,12 +169,12 @@ WIP
 
 # Custom User Modules
 
-### Digital Twin 
+### Digital Twin
 
 
 ## SDF
 
-Each model.sdf **must** declare the `libAircraftConfigPlugin.so` plugin. 
+Each model.sdf **must** declare the `libAircraftConfigPlugin.so` plugin.
 This is a dummy plugin allowing us to set arbitrary configuration data.
 An example configuration may look like this,
 
@@ -195,11 +185,11 @@ An example configuration may look like this,
 
     <!-- The center of thrust must be defined in order to attach the aircraft
 model to the simulation. The offset will in relation to this specified link -->
-    <centerOfThrust> 
+    <centerOfThrust>
         <link>battery</link>
         <offset>0 0 0.058</offset>
     </centerOfThrust>
-    <!-- Specify all the sensors this aircraft supports. Valid sensor types 
+    <!-- Specify all the sensors this aircraft supports. Valid sensor types
 are "imu, esc, and battery" -->
     <sensors>
       <sensor type="imu">
@@ -228,22 +218,22 @@ minimum the aircraft must subscribe to motor commands and publish IMU messages
 
 #### GymFC to Aircraft
 
-*Topic* /aircraft/command/motor 
+*Topic* /aircraft/command/motor
 *Message Type* [MotorCommand.proto]()
 
 #### Aircraft to GymFC
 
-*Topic* /aircraft/sensor/imu 
+*Topic* /aircraft/sensor/imu
 
 *Message Type* Imu.proto
 
 
-*Topic* /aircraft/sensor/esc 
+*Topic* /aircraft/sensor/esc
 
 *Message Type* EscSensor.proto
 
 
-# Development Team 
+# Development Team
 GymFC was developed and currently maintained by [Wil Koch](https://wfk.io).
 
 
@@ -256,5 +246,5 @@ For Python we are following the [Google Python style guide](https://google.githu
 There are many ways to contribute to the project, some ways are listed below.
 
 * Migration of Iris model
-* Motor and Sensor model development 
+* Motor and Sensor model development
 * Navigation and tasks
