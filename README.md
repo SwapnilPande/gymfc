@@ -95,6 +95,46 @@ Note, Ubuntu 16.04 LTS and 18.04 LTS are the only OS currently supported. Please
 6. Confirm `SetupFile` in `gymfc.ini` is pointing to the correct location.
 
 
+# Setting up an aircraft model
+Once you have the package installed, you need to setup an aircraft to simulate in Gazebo. The current prebuilt models are [solo](https://github.com/wil3/gymfc-digitaltwin-solo) and [NF1](https://github.com/wil3/gymfc/tree/thesis-work/modules). Currently, solo is not functional and needs development help. NF1 is currently working in the simulator. Clone the desired model to a logical location on your computer. You will pass the path to the `.sdf` file to GymFC when using the library.
+
+
+### Directory Layout
+GymFC expects your model to have the following Gazebo style directory structure:
+```
+model_name/
+  model.config
+  model.sdf
+  plugins/
+    build/
+```
+
+
+where the `plugin` directory contains the  source for your plugins and the
+`build` directory will contain the built binary plugins. GymFC will, at
+runtime, add the build directory to the Gazebo plugin path so they can be found and loaded.
+
+NOTE! If you are using external plugins create soft links
+to each .so file in the build directory.
+
+### Configure Aircraft Plugins
+The solo and NF1 models depend on the plugins in the [gymfc-aircraft-plugins repo](https://github.com/wil3/gymfc-aircraft-plugins). To setup these plugins:
+1. Create the `plugins` and `plugins/build` directories in your model path according to the directory layout above.
+2. Clone the [gymfc-aircraft-plugins repo](https://github.com/wil3/gymfc-aircraft-plugins).
+3. Build the plugins. From the root directory of the repo, run:
+```
+mkdir build
+cd build
+cmake ../
+make
+```
+4. Symlink the `.so` files in the build directory to the plugins build directory within the model directory:
+```
+cp --symbolic-link *.so INSERT_MODEL_DIRECTORY/plugins/build/
+```
+5. Test that the model is configured correctly by running `tests/test_axis.py`
+
+
 # Getting Started
 
 The simplest environment can be created with,
@@ -119,21 +159,7 @@ class MyOpenAIEnv(FlightControlEnv, gym.Env):
 
 For simplicity the GymFC environment takes as input a single `aircraft_config` which is the file location of your aircraft model  `model.sdf`. The SDF declares all the visualizations, geometries and plugins for the aircraft.
 
-### Directory Layout
-GymFC expects your model to have the following Gazebo style directory structure:
-```
-model_name/
-  model.config
-  model.sdf
-  plugins/
-    build/
-```
-where the `plugin` directory contains the  source for your plugins and the
-`build` directory will contain the built binary plugins. GymFC will, at
-runtime, add the build directory to the Gazebo plugin path so they can be found and loaded.
 
-NOTE! If you are using external plugins create soft links
-to each .so file in the build directory.
 
 
 
