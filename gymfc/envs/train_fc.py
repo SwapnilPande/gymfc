@@ -34,14 +34,15 @@ def main():
     logger.set_level(logger.INFO)
 
     # Create a callback to save model checkpoints
-    checkpoint_callback = CheckpointCallback(save_freq=100000, save_path='./logs/ckpts/')
+    checkpoint_callback = CheckpointCallback(save_freq=100000, save_path='./logs_1/ckpts/',
+                                             name_prefix='rl_model_2')
 
     # Create a separate evaluation environment
     eval_env = gym.make('attitude-fc-v0')
 
     # Callback to evaluate the model during training
-    eval_callback = EvalCallback(eval_env, best_model_save_path='./logs/best_model',
-                                log_path='./logs/results', eval_freq=100000)
+    eval_callback = EvalCallback(eval_env, best_model_save_path='./logs_1/best_model',
+                                log_path='./logs_1/results', eval_freq=100000)
     # Create the callback list
     callback = CallbackList([checkpoint_callback, eval_callback])
 
@@ -56,11 +57,11 @@ def main():
                 nminibatches=nminibatches,
                 gamma=gamma,
                 lam=lam,
-                tensorboard_log='./logs/tensorboard/ppo2/')
+                tensorboard_log='./logs_1/tensorboard/ppo2/')
 
     # Train and save the model
     model.learn(total_timesteps=total_timesteps, callback=callback)
-    model.save("./logs/saved_models/ppo2_1")
+    model.save("./logs_1/saved_models/ppo2_1")
 
     env.close()
 

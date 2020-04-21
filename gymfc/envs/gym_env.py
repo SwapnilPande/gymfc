@@ -58,12 +58,6 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         self.omega_target = [0, 0, 0]
         self.pulse_time = 0
 
-        self.error = None # Error between desired omega and actual omega
-        self.error_prev = 0 # Omega error at last time step
-        self.delta_error = None # Change in error since last time step
-
-        self.prev_action = 0
-
         # Load reward parameters
         cfg = configparser.ConfigParser()
         cfg.read(REWARD_CONFIG)
@@ -80,18 +74,15 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
     # Therefore, the action can be directly passed to the environment simulation, assuming that
     # the action space has been defined to mirror the expected range of motor control signals.
     def step(self, action):
-        # if np.any(np.isnan(action)):
-        #     print("Fucking NaN!")
-        #     action = np.array([0, 0, 0, 0])
 
-        action_sample = self.sample_target_command(mean=action, stdev=0.1)
+        # action_sample = self.sample_target_command(mean=action, stdev=0.1)
 
         # Perform a step in the simulation and receive an updated observation
-        self.state = self.step_sim(action_sample)
+        self.state = self.step_sim(action)
         self.omega_actual = self.state[0:3]
 
         # Compute the reward for the current time step
-        self.reward = self.compute_reward(action_sample)
+        self.reward = self.compute_reward(action)
 
         self.generate_command()
 
@@ -110,14 +101,22 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         self.num_steps += 1
 
         return self.observation, self.reward, self.dones, self.info
-
         
 
     # Reset the environment.
     # Obtains the initial state and calculates the initial observation.
     # Generates the target angular velocity command (omega_target)
     def reset(self):
+
         self.num_steps = 0
+        self.reward = 0
+
+        self.error = 0 # Error between desired omega and actual omega
+        self.error_prev = 0 # Omega error at last time step
+        self.delta_error = 0 # Change in error since last time step
+
+        self.pulse_command = False
+        self.prev_action = 0
 
         # Get the initial state
         self.state = super().reset()
@@ -137,7 +136,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
     def update_observation(self):
         
         # Calculate the error between the desired angular velocity and the current angular velocity
-        self.error = (self.omega_target - self.omega_actual) / 1000
+        self.error = (self.omega_target - self.omega_actual)
 
         # Calculate the change in error since the last time step
         self.delta_error = self.error - self.error_prev
@@ -158,9 +157,11 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
             self.omega_target = np.array([0, 0, 0])
 
         # Pulse ON for 2 seconds to teach acceleration to command
-        elif self.sim_time < 2.5:
+        elif self.sim_time < 2.5 and not self.pulse_command:
             self.omega_target = self.sample_target_command(mean=np.array([0, 0, 0]), stdev=100)
-
+            self.pulse_command = True
+        elif self.sim_time < 2.5:
+            pass
         # Pulse OFF for 2 seconds to teach deceleration back to idle/hover
         else:
             self.omega_target = np.array([0, 0, 0])
@@ -175,8 +176,6 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
     # Calculate the reward function.
     def compute_reward(self, action):
-        # if np.any(np.isnan(action)):
-        #     action = np.array([0, 0, 0, 0])
 
         reward = 0 # Store the cumulative rewards
 
