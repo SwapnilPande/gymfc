@@ -7,18 +7,33 @@ from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common import make_vec_env
 from stable_baselines import PPO2
 
+# Custom flight controller environment
 from gymfc.envs.fc_env import FlightControlEnv
 
+# Gazebo model config file
 AIRCRAFT_CONFIG = "gymfc/envs/assets/gazebo/models/nf1/model.sdf"
+
+# This is where you set the reward parameters
+# Check compute_reward() for more details
 REWARD_CONFIG = "gymfc/reward_params.config"
 
 
+## Attitude Flight Controller Environment ##
+#  This environment is for training a drone to maintain a desired 
+#  angular velocity by directly controlling the 4 motor values. By 
+#  teaching the drone to reach desired angular velocities, a pilot 
+#  can then fly the drone in "Acro" mode (direct control over roll pitch yaw
+#  angular velocities). 
+#
+#  Inherits from a base Gym environment.
 class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
     def __init__(self, max_sim_time=4.5):
+
+        # Initialize the base GymFC environment and Gym env
         super(AttitudeFlightControlEnv, self).__init__(aircraft_config=AIRCRAFT_CONFIG)
 
+        # Total episode time
         self.max_sim_time = max_sim_time
-        self.num_steps = 0
 
         # Define the action space
         # This is currently defined for DShot ESCs that can receive a 
@@ -39,52 +54,51 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         # The observation and state will be initially set when reset() is called.
         # The state is a flattened array with sensor measurements in the same order
         # as defined in the model.sdf file. 
-        #
-        # TODO: Revisit this definition
         self.state = None
 
         # The observation is the angular velocity error and the change in angular velocity error
         # since the last time step
         #
-        # error = omega_target - imu_angular_velocity
+        # error = omega_target - omega_actual
         # delta_error = error - error_prev
         self.observation = None
 
-        # The current angular velocity of th UAV (roll, pitch, yaw) in rad/s.
-        # This will be used to calculat the observation
+        # The current angular velocity of the UAV (roll, pitch, yaw) in rad/s.
+        # This will be used to calculate the observation
         self.omega_actual = None
 
         # The desired angular velocity of the flight controller
         self.omega_target = [0, 0, 0]
-        self.pulse_time = 0
 
         # Load reward parameters
         cfg = configparser.ConfigParser()
         cfg.read(REWARD_CONFIG)
         params = cfg["PARAMETERS"]
 
-        self.beta = int(params["Beta"]) # Scaling factor for penalizing large changes in control signals
-        self.epsilon = float(params["Epsilon"]) # Scaling factor for the desired error gap around omega_target
-        self.alpha = int(params["Alpha"]) # Scaling factor for rewarding smaller control signal values
+        self.beta = int(params["Beta"])               # Scaling factor for penalizing large changes in control signals
+        self.epsilon = float(params["Epsilon"])       # Scaling factor for the desired error gap around omega_target
+        self.alpha = int(params["Alpha"])             # Scaling factor for rewarding smaller control signal values
         self.max_penalty = int(params["Max_penalty"]) # To heavily penalize for certain actions and make sure they never happen again
 
+        # Debug stuff (to be deleted later)
         self.episode_count = 0
         self.episode_reward = 0
         self.hit_max_1 = 0
         self.hit_max_2 = 0
+        self.max_penalty_count_2 = 0
         self.hit_max_3 = 0
+        self.max_penalty_count_3 = 0
+        self.num_steps = 0
 
     # Action: Output from the neural net. 
     # The current RL algorithm implementation is from stable_baselines(https://github.com/hill-a/stable-baselines),
     # Which clips and scales the NN output to the action space defined in environment.
     # Therefore, the action can be directly passed to the environment simulation, assuming that
-    # the action space has been defined to mirror the expected range of motor control signals.
+    # the action space has been defined to mirror the expected range of motor control signals (DShot: 0 to 1).
     def step(self, action):
 
-        # action_sample = self.sample_target_command(mean=action, stdev=0.1)
-
-        # transform_output() goes here for PPO1
-        # action is stochastic between -1 and 1, 1) clip to [-1,1] and then scale to [0, 1]
+        # transform_output() goes here for PPO1 (Will Koch's implementation)
+        # action is Gaussian between -1 and 1, clip to [-1,1] and then scale to [0, 1]
 
         # Perform a step in the simulation and receive an updated observation
         self.state = self.step_sim(action)
@@ -92,6 +106,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
         # Compute the reward for the current time step
         self.reward = self.compute_reward(action)
+
         self.episode_reward += self.reward
 
         self.generate_command()
@@ -104,7 +119,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
         if self.dones:
             self.episode_count += 1
-            print("EPISODE:", self.episode_count, self.hit_max_1, self.hit_max_2, self.hit_max_3)
+            print("EPISODE:", self.episode_count, self.hit_max_2, self.hit_max_3)
         
         # Record some info on the simulation step
         self.info = {"sim_time": self.sim_time, "sp": self.omega_target, "current_rpy": self.omega_actual}
@@ -128,7 +143,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         self.error_prev = 0 # Omega error at last time step
         self.delta_error = 0 # Change in error since last time step
 
-        self.pulse_command = False
+        self.pulse_command = False # True if pulsing a desired angular velocity 
         self.prev_action = 0
 
         # Get the initial state
@@ -137,8 +152,9 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
         self.hit_max_1 = 0
         self.hit_max_2 = 0
+        self.max_penalty_count_2 = 0
         self.hit_max_3 = 0
-
+        self.max_penalty_count_3 = 0
 
         # Generate a target angular velocity command
         self.generate_command()
@@ -148,7 +164,6 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
         return self.observation
         
-
 
     # Update the observation based on the new state.
     def update_observation(self):
@@ -174,18 +189,18 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         if self.sim_time < 0.5:
             self.omega_target = np.array([0, 0, 0])
 
-        # Pulse ON for 2 seconds to teach acceleration to command
+        # Pulse ON for 2 seconds to teach maintaining a set angular velocity
         elif self.sim_time < 2.5 and not self.pulse_command:
             self.omega_target = self.sample_target_command(mean=np.array([0, 0, 0]), stdev=100)
             self.pulse_command = True
 
+        # Keep set angular velocity for duration of pulse
         elif self.sim_time < 2.5:
             pass
+
         # Pulse OFF for 2 seconds to teach deceleration back to idle/hover
         else:
             self.omega_target = np.array([0, 0, 0])
-
-        # self.omega_target = np.array([0, 0, 0])
 
     
     # Sample a target command from a normal distribution.
@@ -221,18 +236,20 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         # PPO2 output is already clipped, so it can never be oversaturated
 
         # Penalize for oversaturating any element in the control signal
-        if np.sum(np.maximum(action - 1, np.zeros(shape=action.shape))) != 0:
-            reward -= self.max_penalty * np.sum(np.maximum(action - 1, np.zeros(shape=action.shape)))
-            self.hit_max_1 += 1
+        # if np.sum(np.maximum(action - 1, np.zeros(shape=action.shape))) != 0:
+        #     reward -= self.max_penalty * np.sum(np.maximum(action - 1, np.zeros(shape=action.shape)))
+        #     self.hit_max_1 += 1
 
         # Penalize if all control signals have been saturated
         if np.all(action >= 1):
+            self.max_penalty_count_2 -= self.max_penalty
             reward -= self.max_penalty
             self.hit_max_2 += 1
 
         
         # Penalize if agent does nothing (action = 0) and there is an omega_target other than 0. 
         if np.count_nonzero(action) < 2 and np.any(self.omega_target):
+            self.max_penalty_count_3 -= self.max_penalty
             reward -= self.max_penalty
             self.hit_max_3 += 1
         

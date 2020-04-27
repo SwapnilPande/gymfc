@@ -20,12 +20,42 @@ from gym import wrappers, logger, spaces
 from stable_baselines import PPO2
 from stable_baselines.common import make_vec_env
 from stable_baselines.common.policies import MlpPolicy
-from stable_baselines.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
+from stable_baselines.common.callbacks import BaseCallback, CallbackList, CheckpointCallback, EvalCallback
 from gymfc.envs.fc_env import FlightControlEnv
 from gymfc.envs.gym_env import AttitudeFlightControlEnv
+import tensorflow as tf
 
 # Training hyperparameters config file
 TRAINING_CONFIG = "./training_params.config"
+
+
+class TensorboardCallback(BaseCallback):
+    """
+    Custom callback for plotting additional values in tensorboard.
+    """
+    def __init__(self, env, verbose=0):
+        self.env = env 
+        super(TensorboardCallback, self).__init__(verbose)
+
+    def _on_step(self) -> bool:
+            
+        # Log scalar value (here a random variable)
+        if self.env.sim_time == self.env.max_sim_time - self.env.stepsize:
+            with tf.variable_scope('max_penalty_watch', reuse=False):
+                # tf.summary.scalar('mp_1', self.env.max_penalty_count_2)
+                # tf.summary.scalar('mp_2', self.env.max_penalty_count_3)
+                mp_count_2 = self.env.max_penalty_count_2
+                mp_count_3 = self.env.max_penalty_count_3
+
+                summary_1 = tf.Summary(value=[tf.Summary.Value(tag='mp_count_2', simple_value=mp_count_2)])
+                summary_2 = tf.Summary(value=[tf.Summary.Value(tag='mp_count_3', simple_value=mp_count_3)])
+
+                self.locals['writer'].add_summary(summary_1, self.num_timesteps)
+                self.locals['writer'].add_summary(summary_2, self.num_timesteps)
+
+
+        return True
+
 
 # Gradually decrease the learning rate as the training progresses.
 def create_lr_callback(lr_max, lr_min):
@@ -88,11 +118,14 @@ def main():
     eval_callback = EvalCallback(eval_env, best_model_save_path=best_model_save_path,
                                 log_path=log_path, eval_freq=100000)
 
-    # Create the callback list
-    callback = CallbackList([checkpoint_callback, eval_callback])
-
     # Create training environment
     env = gym.make('attitude-fc-v0')
+
+    # Callback to add max penalty watchers to Tensorboard
+    tb_callback = TensorboardCallback(env)
+
+    # Create the callback list
+    callback = CallbackList([checkpoint_callback, eval_callback, tb_callback])
 
     # RL Agent
     model = PPO2(MlpPolicy, 
