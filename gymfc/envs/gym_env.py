@@ -80,7 +80,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         self.alpha = int(params["Alpha"])             # Scaling factor for rewarding smaller control signal values
         self.max_penalty = int(params["Max_penalty"]) # To heavily penalize for certain actions and make sure they never happen again
 
-        # Debug stuff (to be deleted later)
+        # Debug stuff
         self.episode_count = 0
         self.episode_reward = 0
         self.hit_max_1 = 0
@@ -88,7 +88,6 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         self.max_penalty_count_2 = 0
         self.hit_max_3 = 0
         self.max_penalty_count_3 = 0
-        self.num_steps = 0
 
     # Action: Output from the neural net. 
     # The current RL algorithm implementation is from stable_baselines(https://github.com/hill-a/stable-baselines),
@@ -116,17 +115,11 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
 
         # Check if the simulation has completed
         self.dones = self.sim_time >= self.max_sim_time
-
-        if self.dones:
-            self.episode_count += 1
-            print("EPISODE:", self.episode_count, self.hit_max_2, self.hit_max_3)
         
         # Record some info on the simulation step
         self.info = {"sim_time": self.sim_time, "sp": self.omega_target, "current_rpy": self.omega_actual}
 
         self.prev_action = action 
-
-        self.num_steps += 1
 
         return self.observation, self.reward, self.dones, self.info
         
@@ -136,25 +129,25 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
     # Generates the target angular velocity command (omega_target)
     def reset(self):
 
-        self.num_steps = 0
-        self.reward = 0
-
         self.error = 0 # Error between desired omega and actual omega
         self.error_prev = 0 # Omega error at last time step
         self.delta_error = 0 # Change in error since last time step
-
         self.pulse_command = False # True if pulsing a desired angular velocity 
-        self.prev_action = 0
+        self.prev_action = 0 # Store the previous agent action
 
         # Get the initial state
         self.state = super().reset()
         self.omega_actual = self.state[0:3]
 
-        self.hit_max_1 = 0
-        self.hit_max_2 = 0
-        self.max_penalty_count_2 = 0
-        self.hit_max_3 = 0
-        self.max_penalty_count_3 = 0
+        # Reset reward counts
+        self.reward = 0 # Episodic reward
+        self.error_reward = 0
+        self.signal_flux_reward = 0
+        self.small_signal_reward = 0
+        self.saturated_output_count = 0
+        self.saturated_max_penalty = 0
+        self.inactive_output_count = 0
+        self.inactive_max_penalty = 0
 
         # Generate a target angular velocity command
         self.generate_command()
@@ -213,7 +206,7 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
     # Calculate the reward function.
     def compute_reward(self, action):
 
-        reward = 0 # Store the cumulative rewards
+        reward = 0 # Store the cumulative reward per step
 
         # Calculate the updated error 
         error = self.omega_target - self.omega_actual
@@ -222,36 +215,45 @@ class AttitudeFlightControlEnv(FlightControlEnv, gym.Env):
         sum_squared_error = np.sum(np.square(error))
         sum_squared_error_prev = np.sum(np.square(self.error_prev))
         reward += -(sum_squared_error - sum_squared_error_prev)
+        self.error_reward += -(sum_squared_error - sum_squared_error_prev)
 
         # Penalize for large control signal fluctuations
         reward -= self.beta * np.max(np.abs(action - self.prev_action))
+        self.signal_flux_reward -= self.beta * np.max(np.abs(action - self.prev_action))
 
         # Reward smaller control signal values
         # Only apply this reward if the agent is already able to achieve an error
         # within the specified error band gap. This gap can be scaled with epsilon.
         if np.all(np.abs(error) < self.epsilon * np.abs(self.omega_target)):
             reward += self.alpha * (1 - np.mean(action))
+            self.small_signal_reward += self.alpha * (1 - np.mean(action))
 
         ## Right now, the next two don't do anything
         # PPO2 output is already clipped, so it can never be oversaturated
 
         # Penalize for oversaturating any element in the control signal
+        # NOTE: This has been modified from the original work to penalize any action being equal to 1.
+        # May not be a good reward.
         # if np.sum(np.maximum(action - 1, np.zeros(shape=action.shape))) != 0:
-        #     reward -= self.max_penalty * np.sum(np.maximum(action - 1, np.zeros(shape=action.shape)))
-        #     self.hit_max_1 += 1
+            # reward -= self.max_penalty * np.sum(np.maximum(action - 1, np.zeros(shape=action.shape)))
+            # self.hit_max_1 += 1
+        
+        # if np.sum(np.maximum(action - 1, np.zeros(shape=action.shape))) != 0:
+            # reward -= self.max_penalty * np.sum(np.maximum(action - 1, np.zeros(shape=action.shape)))
+            # self.hit_max_1 += 1
 
         # Penalize if all control signals have been saturated
         if np.all(action >= 1):
-            self.max_penalty_count_2 -= self.max_penalty
+            self.saturated_max_penalty -= self.max_penalty
             reward -= self.max_penalty
-            self.hit_max_2 += 1
+            self.saturated_output_count += 1
 
         
         # Penalize if agent does nothing (action = 0) and there is an omega_target other than 0. 
         if np.count_nonzero(action) < 2 and np.any(self.omega_target):
-            self.max_penalty_count_3 -= self.max_penalty
+            self.inactive_max_penalty -= self.max_penalty
             reward -= self.max_penalty
-            self.hit_max_3 += 1
+            self.inactive_output_count += 1
         
 
         return reward

@@ -238,6 +238,7 @@ class FlightControlEnv(ABC):
         else:
             self.aircraft_port = default.getint("FCPluginPortRangeBegin")
 
+        print("INFO: GAZEBO_MASTER_URI port is ", self.gz_port)
 
         # Next, once the config.ini file is parsed, we need to parse the model.sdf file
         self._parse_model_sdf()
