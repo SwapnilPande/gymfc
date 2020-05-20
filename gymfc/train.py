@@ -97,7 +97,7 @@ def main():
 
     # Argument parser to select model type
     parser = argparse.ArgumentParser(description="Train a reinforcement learning flight controller.")
-    parser.add_argument('-m','--model',help="RL Agent to train on.")
+    parser.add_argument('-m','--model', help="RL Agent to train on.")
     args = vars(parser.parse_args())
 
     # Create a Comet experiment with an API key
@@ -177,6 +177,7 @@ def main():
     # RL Agent; Current options are PPO1 or PPO2
     # Note: PPO2 does not work w/o vectorized environments (gymfc is not vectorized)
     if args["model"] == "PPO2":
+        print("PPO2!")
         model = PPO2(MlpPolicy, 
                     env,
                     n_steps=n_steps,
@@ -217,6 +218,7 @@ def main():
     model.save(model_save_path)
 
     env.close()
+    eval_env.close()
 
 
 if __name__ == '__main__':
