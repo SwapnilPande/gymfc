@@ -102,7 +102,9 @@ def main():
 
     # Create a Comet experiment with an API key
     experiment = Experiment(api_key="Bq3mQixNCv2jVzq2YBhLdxq9A",
-                            project_name="rl-flight-controller", workspace="alexbarnett12")
+                            project_name="rl-flight-controller", workspace="alexbarnett12",
+                            log_env_gpu = False, log_env_cpu = False, log_env_host= False, 
+                            log_git_metadata = False, log_git_patch = False)
 
     # Load training parameters
     cfg = configparser.ConfigParser()
@@ -138,7 +140,7 @@ def main():
 
     # You can set the level to logger.DEBUG or logger.WARN if you
     # want to change the amount of output.
-    logger.set_level(logger.INFO)
+    logger.set_level(logger.DEBUG)
 
     # Create save directory and various save paths
     model_log_dir = create_model_log_dir()
@@ -157,11 +159,11 @@ def main():
                                              name_prefix='rl_model')
 
     # Create a separate evaluation environment
-    eval_env = gym.make('attitude-fc-v0')
+    #eval_env = gym.make('attitude-fc-v0')
 
     # Callback to evaluate the model during training
-    eval_callback = EvalCallback(eval_env, best_model_save_path=best_model_save_path,
-                                log_path=log_path, eval_freq=100000)
+    #eval_callback = EvalCallback(eval_env, best_model_save_path=best_model_save_path,
+    #                            log_path=log_path, eval_freq=100000)
 
     # Create training environment
     env = gym.make('attitude-fc-v0')
@@ -170,8 +172,8 @@ def main():
     tb_callback = TensorboardCallback(env)
 
     # Create the callback list
-    callback = CallbackList([checkpoint_callback, eval_callback, tb_callback])
-
+    #callback = CallbackList([checkpoint_callback, eval_callback, tb_callback])
+    callback = CallbackList([checkpoint_callback, tb_callback])
     # RL Agent; Current options are PPO1 or PPO2
     # Note: PPO2 does not work w/o vectorized environments (gymfc is not vectorized)
     if args["model"] == "PPO2":
@@ -185,7 +187,8 @@ def main():
                     lam=lam,
                     cliprange=clip,
                     ent_coef=ent_coeff,
-                    tensorboard_log=tensorboard_dir)
+                    tensorboard_log=tensorboard_dir,
+                    policy_kwargs= {layers: [32,32]})
         experiment.add_tag("PPO2")
 
     else:

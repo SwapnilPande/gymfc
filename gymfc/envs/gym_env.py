@@ -11,7 +11,7 @@ from stable_baselines import PPO2
 from gymfc.envs.fc_env import FlightControlEnv
 
 # Gazebo model config file
-AIRCRAFT_CONFIG = "gymfc/envs/assets/gazebo/models/nf1/model.sdf"
+AIRCRAFT_CONFIG = "/data/gymfc-digitaltwin-solo/models/nf1/model.sdf"
 
 # This is where you set the reward parameters
 # Check compute_reward() for more details
